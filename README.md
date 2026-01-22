@@ -73,6 +73,35 @@ The **LLM Control Plane** is a production-grade runtime governance layer that or
 
 ---
 
+## 🛠️ Tech Stack
+
+### Core Technologies
+
+| Category | Technology | Purpose |
+|----------|-----------|---------|
+| **API Framework** | FastAPI | High-performance async API server |
+| **Async Runtime** | Python AsyncIO | Concurrent request handling |
+| **Data Validation** | Pydantic | Request/response validation & settings |
+| **Caching** | Redis | Distributed caching for inference results |
+| **Observability** | Prometheus | Metrics collection & monitoring |
+| **Observability** | OpenTelemetry (optional) | Distributed tracing |
+| **Embeddings** | Sentence Transformers | Semantic similarity for evaluation |
+| **Policy Engine** | Open Policy Agent / Custom | Runtime policy enforcement |
+| **Containerization** | Docker | Application containerization |
+| **Orchestration** | Docker Compose | Multi-container deployment |
+| **Testing** | pytest | Unit & integration testing |
+
+### Technology Integration
+
+- **FastAPI + AsyncIO**: Enables high-concurrency request processing with async/await patterns
+- **Pydantic**: Validates all API inputs/outputs and manages configuration via environment variables
+- **Redis**: Provides distributed caching layer for inference results, reducing LLM API calls
+- **Prometheus**: Exposes `/metrics` endpoint for QPS, latency, cost, and error rate monitoring
+- **Sentence Transformers**: Powers semantic similarity checks for hallucination detection and grounding validation
+- **Policy Engine**: Custom YAML-based policy engine with optional OPA integration for complex rule sets
+
+---
+
 ## 🏗️ System Architecture
 
 ### Component Architecture
