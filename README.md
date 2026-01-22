@@ -116,90 +116,183 @@ The **LLM Control Plane** is a production-grade runtime governance layer that or
 
 ## 🏗️ System Architecture
 
-### Component Architecture
+### System Topology
 
-The control plane is organized into four primary layers, each handling distinct responsibilities:
-
-**Ingress Layer** → **Governance Core** → **Execution Engine** → **Enforcement Layer**
+The control plane operates as a middleware layer between clients and LLM providers, implementing a four-stage pipeline:
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    API Gateway (FastAPI)                      │
-│  • Request validation                                         │
-│  • Rate limiting                                             │
-│  • Authentication                                             │
-└───────────────────────┬──────────────────────────────────────┘
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-┌───────▼────────┐            ┌──────────▼──────────┐
-│ Policy Engine  │            │   Risk Scorer       │
-│ (YAML Config)  │            │  • Injection detect │
-└───────┬────────┘            │  • Safety classify  │
-        │                     └──────────┬──────────┘
-        │                                │
-┌───────▼────────────────────────────────▼──────────┐
-│              Decision Matrix                        │
-│  • Multi-factor routing                            │
-│  • Cost-aware model selection                      │
-│  • RAG requirement analysis                        │
-└───────┬────────────────────────────────────────────┘
-        │
-┌───────▼────────────────────────────────────────────┐
-│           Execution Orchestrator                    │
-│  • Inference adapter (OpenAI/Anthropic)            │
-│  • RAG pipeline (vector retrieval)                 │
-│  • Cache manager (in-memory/Redis)                 │
-└───────┬────────────────────────────────────────────┘
-        │
-┌───────▼────────────────────────────────────────────┐
-│         Enforcement & Quality Gate                  │
-│  • Post-generation evaluation                      │
-│  • Policy validation                               │
-│  • Action execution (return/retry/block)           │
-└────────────────────────────────────────────────────┘
+                    ┌─────────────────────┐
+                    │   Client Requests   │
+                    │  (HTTP/gRPC)        │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────────────────────────────┐
+                    │         INGRESS LAYER                        │
+                    │  FastAPI + AsyncIO + Pydantic                │
+                    │  • Request validation & parsing              │
+                    │  • Rate limiting (per client/IP)            │
+                    │  • Authentication & authorization           │
+                    └──────────┬──────────────────────────────────┘
+                               │
+                    ┌──────────▼──────────────────────────────────┐
+                    │      GOVERNANCE CORE                         │
+                    │  ┌────────────┐  ┌────────────┐            │
+                    │  │   Policy   │  │    Risk    │            │
+                    │  │   Engine   │  │   Scorer   │            │
+                    │  │  (YAML)    │  │ (Patterns) │            │
+                    │  └─────┬──────┘  └──────┬─────┘            │
+                    │        │                │                   │
+                    │  ┌─────▼────────────────▼─────┐            │
+                    │  │      Cost Model             │            │
+                    │  │  (Token counting & pricing) │            │
+                    │  └─────┬───────────────────────┘            │
+                    │        │                                    │
+                    │  ┌─────▼───────────────────────┐            │
+                    │  │    Decision Matrix          │            │
+                    │  │  Multi-factor routing logic │            │
+                    │  └─────┬───────────────────────┘            │
+                    └────────┼────────────────────────────────────┘
+                             │
+                    ┌────────▼────────────────────────────────────┐
+                    │      EXECUTION ENGINE                       │
+                    │  ┌────────────┐  ┌────────────┐            │
+                    │  │  Router    │  │   Cache    │            │
+                    │  │ (Model/RAG)│  │  Manager   │            │
+                    │  └─────┬──────┘  └──────┬─────┘            │
+                    │        │                │                   │
+                    │  ┌─────▼────────────────▼─────┐            │
+                    │  │   Inference Adapter         │            │
+                    │  │  (OpenAI/Anthropic)         │            │
+                    │  └─────┬───────────────────────┘            │
+                    └────────┼────────────────────────────────────┘
+                             │
+                    ┌────────▼────────────────────────────────────┐
+                    │    ENFORCEMENT LAYER                        │
+                    │  ┌────────────┐  ┌────────────┐            │
+                    │  │  Quality   │  │  Decision  │            │
+                    │  │  Evaluator │  │  Enforcer  │            │
+                    │  │(Halluc/Gnd)│  │ (Actions)   │            │
+                    │  └─────┬──────┘  └──────┬──────┘            │
+                    └────────┼────────────────┼───────────────────┘
+                             │                │
+                    ┌────────▼────────────────▼────────┐
+                    │      Observability                │
+                    │  Prometheus + OpenTelemetry       │
+                    └───────────────────────────────────┘
+                             │
+                    ┌────────▼──────────────────────────┐
+                    │      Response + Trace             │
+                    └───────────────────────────────────┘
 ```
+
+### Component Interaction Model
+
+Components communicate through well-defined interfaces:
+
+**Synchronous Operations** (within request lifecycle):
+- Ingress → Governance Core → Execution Engine → Enforcement Layer
+- Each stage returns structured data (Pydantic models)
+
+**Asynchronous Operations** (background):
+- Metrics collection to Prometheus
+- Cache updates to Redis
+- Distributed tracing via OpenTelemetry
+
+**External Integrations**:
+- LLM providers (OpenAI/Anthropic) via HTTP
+- Vector databases (for RAG) via client libraries
+- Redis (caching) via async client
 
 ### Request Processing Flow
 
-Each request undergoes a deterministic sequence of checks and transformations:
+Each request flows through three governance stages with parallel and sequential checks:
 
-**Stage 1: Pre-Generation Analysis**
 ```
-Request → Risk Scoring → Safety Check → Cost Estimation → Policy Validation
-   │            │              │                │                  │
-   └────────────┴──────────────┴────────────────┴──────────────────┘
-                                    │
-                           [Decision: Allow/Block]
-```
-
-**Stage 2: Routing & Execution**
-```
-Allowed Request → Model Selection → Cache Check → RAG Decision → Inference
-                      │                │              │              │
-                      └────────────────┴──────────────┴──────────────┘
-                                              │
-                                    [Output Generated]
-```
-
-**Stage 3: Post-Generation Enforcement**
-```
-Output → Quality Evaluation → Policy Check → Action Selection → Response
-   │            │                  │               │              │
-   └────────────┴──────────────────┴───────────────┴──────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          INCOMING REQUEST                                │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+                ┌───────────────┼───────────────┐
+                │               │               │
+        ┌───────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+        │ Risk Scorer  │ │ Cost Model  │ │Policy Engine│
+        │  (Patterns)  │ │  (Tokens)   │ │  (YAML)     │
+        └───────┬──────┘ └──────┬──────┘ └──────┬──────┘
+                │               │               │
+                └───────┬───────┴───────┬───────┘
+                        │               │
+                ┌───────▼───────────────▼───────┐
+                │    Decision Matrix            │
+                │  • Risk < 0.8?                │
+                │  • Cost < threshold?          │
+                │  • Policies pass?             │
+                └───────┬───────────────────────┘
                         │
-            [Return/Retry/Downgrade/Block]
+            ┌───────────┴───────────┐
+            │                       │
+        [BLOCK]              [ALLOW]
+            │                       │
+            │              ┌─────────▼─────────┐
+            │              │  Router           │
+            │              │  • Model Select   │
+            │              │  • Cache Check    │
+            │              │  • RAG Decision   │
+            │              └─────────┬─────────┘
+            │                       │
+            │              ┌─────────▼─────────┐
+            │              │  Inference        │
+            │              │  • LLM Call       │
+            │              │  • RAG Retrieval  │
+            │              └─────────┬─────────┘
+            │                       │
+            │              ┌─────────▼─────────┐
+            │              │  Quality Gate     │
+            │              │  • Hallucination  │
+            │              │  • Grounding      │
+            │              │  • Policy Check   │
+            │              └─────────┬─────────┘
+            │                       │
+            └───────────┬───────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+    [RETURN]        [RETRY]        [BLOCK]
+        │               │               │
+        └───────────────┴───────────────┘
+                        │
+                ┌───────▼───────┐
+                │   Response    │
+                │  + Trace      │
+                │  + Metrics    │
+                └───────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Primary Function | Key Operations |
-|-----------|-----------------|----------------|
-| **Policy Engine** | Runtime policy enforcement | YAML policy loading, threshold checks, action determination |
-| **Risk Scorer** | Pre-generation safety analysis | Pattern matching, keyword scanning, risk calculation |
-| **Cost Model** | Token-level cost tracking | Token counting, pricing lookup, budget management |
-| **Router** | Intelligent request routing | Model selection, RAG decision, cache strategy |
-| **Decision Enforcer** | Post-generation validation | Quality gates, policy compliance, action execution |
+**Policy Engine**
+- Runtime policy enforcement from YAML configuration
+- Threshold validation and action determination
+- Policy explainability and decision logging
+
+**Risk Scorer**
+- Pre-generation safety analysis via pattern matching
+- Keyword scanning and injection detection
+- Risk score calculation (0.0-1.0 scale)
+
+**Cost Model**
+- Token-level cost estimation using tiktoken
+- Per-model pricing lookup and budget tracking
+- Auto-downgrade recommendations
+
+**Router**
+- Intelligent request routing based on policies
+- Model selection with cost/performance tradeoffs
+- Cache strategy and RAG requirement analysis
+
+**Decision Enforcer**
+- Post-generation quality validation
+- Policy compliance checking
+- Action execution (return/retry/downgrade/block)
 
 ---
 
@@ -301,14 +394,14 @@ def process_request(prompt):
     return action.execute(output)
 ```
 
-| Decision Point | Input | Output | Example |
-|---------------|-------|--------|---------|
-| **Risk Assessment** | Prompt text | Risk score (0-1) | 0.15 → Safe |
-| **Cost Check** | Estimated cost | Allow/Block | $0.12 > $0.10 → Block |
-| **Model Selection** | Cost, performance | Model name | gpt-4 → gpt-3.5 |
-| **RAG Decision** | Query complexity | Use RAG? | Complex → Yes |
-| **Quality Check** | Hallucination score | Action | 0.85 > 0.7 → Retry |
-| **Enforcement** | All checks | Final action | All passed → Return |
+**Decision Points:**
+
+- **Risk Assessment**: Analyzes prompt text → Returns risk score (0-1). Example: Score 0.15 → Safe, proceed
+- **Cost Check**: Compares estimated cost against threshold → Allow/Block decision. Example: $0.12 > $0.10 threshold → Triggers auto-downgrade
+- **Model Selection**: Evaluates cost and performance constraints → Selects optimal model. Example: gpt-4 → gpt-3.5 (cost optimization)
+- **RAG Decision**: Analyzes query complexity → Determines if retrieval needed. Example: Complex technical query → RAG enabled
+- **Quality Check**: Evaluates hallucination and grounding scores → Action determination. Example: Hallucination 0.85 > 0.7 threshold → Retry with constraints
+- **Enforcement**: Aggregates all check results → Final action execution. Example: All checks pass → Return response
 
 ---
 
@@ -351,16 +444,25 @@ policies:
 
 ### Policy Enforcement Matrix
 
-<div align="center">
+**Cost Policy**
+- Threshold: $0.10 per request
+- Violation action: Block or auto-downgrade to cheaper model
+- Explainability: Full cost breakdown and model comparison
 
-| Policy Type | Threshold | Violation Action | Explainable |
-|:-----------:|:---------:|:----------------:|:-----------:|
-| **Cost** | $0.10/request | Block or Downgrade | ✅ Yes |
-| **Safety** | Risk > 0.8 | Hard Rejection | ✅ Yes |
-| **Quality** | Hallucination > 0.7 | Retry or Block | ✅ Yes |
-| **Latency** | > 5000ms | Downgrade Model | ✅ Yes |
+**Safety Policy**
+- Threshold: Risk score > 0.8
+- Violation action: Hard rejection with explicit reason
+- Explainability: Pattern matches and keyword detections logged
 
-</div>
+**Quality Policy**
+- Threshold: Hallucination probability > 0.7 or grounding < 0.6
+- Violation action: Retry with constraints or block
+- Explainability: Semantic similarity scores and context alignment metrics
+
+**Latency Policy**
+- Threshold: > 5000ms end-to-end
+- Violation action: Downgrade to faster model or reject
+- Explainability: Per-stage latency breakdown
 
 ### Policy Explainability
 
@@ -406,34 +508,46 @@ if estimated_cost > threshold:
 
 ### Cost Optimization Strategies
 
-<div align="center">
+**Cache-First Routing**
+- Mechanism: SHA256-based cache key lookup before any LLM call
+- Impact: 100% cost reduction for cached responses (TTL-based invalidation)
+- Implementation: Redis backend with configurable TTL per request type
 
-| Strategy | Mechanism | Cost Reduction |
-|:--------:|:---------:|:--------------:|
-| **Cache-First** | Check cache before inference | 100% (cached) |
-| **Auto-Downgrade** | Use cheaper models | 10-30x reduction |
-| **Batch Optimization** | Group requests | 20-40% reduction |
-| **Budget Alerts** | Early warning system | Prevents overruns |
+**Auto-Downgrade**
+- Mechanism: Cost threshold violation triggers model downgrade (gpt-4 → gpt-3.5)
+- Impact: 10-30x cost reduction while maintaining acceptable quality
+- Implementation: Per-model pricing table with automatic fallback chain
 
-</div>
+**Batch Optimization**
+- Mechanism: Request grouping and batch processing when possible
+- Impact: 20-40% cost reduction through shared context and token reuse
+- Implementation: Dynamic batching with configurable batch size/timeout
+
+**Budget Alerts**
+- Mechanism: Real-time cost tracking with early warning thresholds
+- Impact: Prevents budget overruns through proactive blocking
+- Implementation: Daily/hourly budget ceilings with Prometheus metrics
 
 ### Cost Decision Example
 
-```
-┌─────────────────────────────────────────┐
-│  Request: "Explain machine learning"    │
-├─────────────────────────────────────────┤
-│  Model: gpt-4-turbo-preview             │
-│  Estimated Cost: $0.12                   │
-│  Policy Threshold: $0.10                 │
-│  Status: ❌ EXCEEDS THRESHOLD           │
-├─────────────────────────────────────────┤
-│  Action: Auto-downgrade                  │
-│  New Model: gpt-3.5-turbo                │
-│  New Cost: $0.003                        │
-│  Savings: 97.5%                          │
-└─────────────────────────────────────────┘
-```
+**Scenario**: User requests "Explain machine learning" with default model gpt-4-turbo-preview
+
+**Initial Calculation:**
+- Input tokens: ~4 tokens
+- Estimated output: ~400 tokens
+- Model pricing: $0.01/1K input, $0.03/1K output
+- Estimated cost: $0.012 (input) + $0.012 (output) = **$0.024**
+
+**Policy Check:**
+- Policy threshold: $0.10 per request
+- Status: ✅ Within budget → **ALLOW**
+
+**Alternative Scenario** (if threshold was $0.02):
+- Status: ❌ Exceeds threshold
+- Action: Auto-downgrade to gpt-3.5-turbo
+- New pricing: $0.0015/1K input, $0.002/1K output
+- New cost: $0.0006 (input) + $0.0008 (output) = **$0.0014**
+- Savings: **94.2%** cost reduction
 
 ---
 
@@ -472,17 +586,25 @@ else:
 
 ### Reliability Features
 
-<div align="center">
+**Fail-Safe Behavior**
+- Implementation: Graceful degradation when external services fail
+- Benefit: System continues operating under partial failures, returns cached responses when possible
 
-| Feature | Implementation | Benefit |
-|:-------:|:--------------:|:-------:|
-| **Fail-Safe Behavior** | Graceful degradation | System continues under load |
-| **Explicit Rejections** | Clear error messages | Debuggable failures |
-| **Retry Logic** | Exponential backoff | Automatic recovery |
-| **Circuit Breakers** | Request throttling | Prevents cascading failures |
-| **Queue Management** | Backpressure handling | Memory protection |
+**Explicit Rejections**
+- Implementation: Structured error responses with policy violation details
+- Benefit: Debuggable failures with full decision trace and reasoning
 
-</div>
+**Retry Logic**
+- Implementation: Exponential backoff with jitter for transient failures
+- Benefit: Automatic recovery from temporary service disruptions
+
+**Circuit Breakers**
+- Implementation: Request throttling based on error rate thresholds
+- Benefit: Prevents cascading failures by isolating problematic components
+
+**Queue Management**
+- Implementation: Backpressure handling with configurable queue limits
+- Benefit: Memory protection and predictable latency under high load
 
 ---
 
