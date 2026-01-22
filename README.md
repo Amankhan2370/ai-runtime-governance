@@ -75,129 +75,149 @@ The **LLM Control Plane** is a production-grade runtime governance layer that or
 
 ## 🏗️ System Architecture
 
-### High-Level Architecture
+### Control Plane Topology
 
 ```mermaid
-graph TB
-    subgraph "Client Layer"
-        A[Applications]
-        B[Services]
-        C[Users]
+flowchart TD
+    subgraph IN["🌐 Ingress Layer"]
+        A1[API Gateway]
+        A2[Request Validator]
+        A3[Rate Limiter]
     end
     
-    subgraph "Control Plane Core"
-        D[API Gateway]
-        E[Lifecycle Manager]
-        
-        subgraph "Governance Layer"
-            F[Policy Engine]
-            G[Risk Scorer]
-            H[Cost Model]
-            I[Router]
-        end
-        
-        subgraph "Enforcement Layer"
-            J[Decision Enforcer]
-            K[Quality Evaluator]
-        end
+    subgraph GOV["⚖️ Governance Core"]
+        B1[Policy Engine<br/>YAML Policies]
+        B2[Risk Scorer<br/>Safety Analysis]
+        B3[Cost Model<br/>Token Estimation]
+        B4[Decision Matrix<br/>Multi-Factor Routing]
     end
     
-    subgraph "Execution Layer"
-        L[Inference Adapter]
-        M[RAG Adapter]
-        N[Evaluation Adapter]
+    subgraph EXE["⚡ Execution Engine"]
+        C1[Inference Orchestrator]
+        C2[RAG Pipeline]
+        C3[Cache Manager]
+        C4[Model Selector]
     end
     
-    subgraph "External Systems"
-        O[OpenAI API]
-        P[Anthropic API]
-        Q[Vector DB]
-        R[Cache Store]
+    subgraph ENF["🛡️ Enforcement Layer"]
+        D1[Quality Gate]
+        D2[Policy Validator]
+        D3[Action Executor]
+        D4[Output Transformer]
     end
     
-    A --> D
-    B --> D
-    C --> D
+    subgraph EXT["🔌 External Services"]
+        E1[LLM Providers]
+        E2[Vector Stores]
+        E3[Cache Backend]
+        E4[Monitoring]
+    end
     
-    D --> E
-    E --> F
-    E --> G
-    E --> H
+    A1 --> A2 --> A3
+    A3 --> B1
+    A3 --> B2
+    A3 --> B3
     
-    F --> I
-    G --> I
-    H --> I
+    B1 --> B4
+    B2 --> B4
+    B3 --> B4
     
-    I --> L
-    I --> M
+    B4 --> C4
+    C4 --> C1
+    C4 --> C2
+    C4 --> C3
     
-    L --> O
-    L --> P
-    M --> Q
-    I --> R
+    C1 --> E1
+    C2 --> E2
+    C3 --> E3
     
-    L --> J
-    M --> J
-    N --> J
+    C1 --> D1
+    C2 --> D1
     
-    J --> K
-    K --> E
-    E --> D
+    D1 --> D2 --> D3 --> D4
+    D4 --> A1
     
-    style E fill:#9B59B6
-    style F fill:#E74C3C
-    style I fill:#3498DB
-    style J fill:#F39C12
+    D3 --> E4
+    
+    style GOV fill:#9B59B6,stroke:#7D3C98,stroke-width:3px
+    style EXE fill:#3498DB,stroke:#2874A6,stroke-width:3px
+    style ENF fill:#E74C3C,stroke:#C0392B,stroke-width:3px
 ```
 
-### Component Interaction Flow
+### Real-Time Decision Pipeline
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant Gateway
-    participant Lifecycle
-    participant RiskScorer
-    participant PolicyEngine
-    participant CostModel
-    participant Router
-    participant Inference
-    participant Evaluator
-    participant Enforcer
+flowchart LR
+    subgraph INPUT["📥 Input"]
+        I1[Request]
+        I2[Context]
+        I3[Metadata]
+    end
     
-    Client->>Gateway: POST /generate
-    Gateway->>Lifecycle: Start Request
+    subgraph ANALYSIS["🔍 Analysis"]
+        A1{Risk<br/>Assessment}
+        A2{Cost<br/>Projection}
+        A3{Policy<br/>Compliance}
+    end
     
-    Lifecycle->>RiskScorer: Score Prompt
-    RiskScorer-->>Lifecycle: Risk Score: 0.15
+    subgraph ROUTING["🎯 Routing"]
+        R1[Model<br/>Selection]
+        R2[RAG<br/>Decision]
+        R3[Cache<br/>Strategy]
+    end
     
-    Lifecycle->>PolicyEngine: Check Safety
-    PolicyEngine-->>Lifecycle: ✅ PASSED
+    subgraph EXECUTION["⚙️ Execution"]
+        E1[Inference]
+        E2[Retrieval]
+        E3[Generation]
+    end
     
-    Lifecycle->>CostModel: Estimate Cost
-    CostModel-->>Lifecycle: $0.12 (gpt-4)
+    subgraph VALIDATION["✅ Validation"]
+        V1{Quality<br/>Check}
+        V2{Policy<br/>Enforcement}
+        V3{Action<br/>Selection}
+    end
     
-    Lifecycle->>PolicyEngine: Check Cost Policy
-    PolicyEngine-->>Lifecycle: ❌ FAILED (threshold: $0.10)
+    subgraph OUTPUT["📤 Output"]
+        O1[Response]
+        O2[Trace]
+        O3[Metrics]
+    end
     
-    Lifecycle->>Router: Route with Constraint
-    Router->>Router: Auto-downgrade to gpt-3.5
-    Router-->>Lifecycle: Model: gpt-3.5-turbo
+    I1 --> A1
+    I2 --> A2
+    I3 --> A3
     
-    Lifecycle->>Inference: Generate
-    Inference-->>Lifecycle: Output + Metadata
+    A1 -->|Pass| R1
+    A1 -->|Fail| O1
+    A2 -->|Pass| R2
+    A2 -->|Fail| R1
+    A3 -->|Pass| R3
+    A3 -->|Fail| O1
     
-    Lifecycle->>Evaluator: Evaluate Quality
-    Evaluator-->>Lifecycle: Scores
+    R1 --> E1
+    R2 --> E2
+    R3 --> E3
     
-    Lifecycle->>Enforcer: Enforce Policies
-    Enforcer->>PolicyEngine: Validate Output
-    PolicyEngine-->>Enforcer: ✅ PASSED
-    Enforcer-->>Lifecycle: Action: RETURN
+    E1 --> V1
+    E2 --> V1
+    E3 --> V1
     
-    Lifecycle->>Gateway: Response + Trace
-    Gateway->>Client: Final Output
+    V1 -->|Pass| V2
+    V1 -->|Fail| V3
+    V2 -->|Pass| O1
+    V2 -->|Fail| V3
+    
+    V3 -->|Return| O1
+    V3 -->|Retry| E1
+    V3 -->|Block| O1
+    V3 -->|Downgrade| R1
+    
+    O1 --> O2 --> O3
+    
+    style ANALYSIS fill:#E74C3C,stroke:#C0392B
+    style ROUTING fill:#3498DB,stroke:#2874A6
+    style VALIDATION fill:#27AE60,stroke:#1E8449
 ```
 
 ---
