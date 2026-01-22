@@ -224,74 +224,62 @@ flowchart LR
 
 ## 🔄 Request Lifecycle Governance
 
-### Complete Request Journey
+### Intelligent Decision Flow
 
-<div align="center">
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  PHASE 1: PRE-GENERATION GOVERNANCE                        │
-├─────────────────────────────────────────────────────────────┤
-│  1. Risk Scoring                                           │
-│     ├─ Prompt injection detection                          │
-│     ├─ Safety classification                               │
-│     └─ Ambiguity analysis                                  │
-│                                                             │
-│  2. Policy Validation                                       │
-│     ├─ Safety policy check → BLOCK if violated            │
-│     ├─ Cost policy check → BLOCK if exceeded              │
-│     └─ Latency budget validation                           │
-│                                                             │
-│  3. Cost Estimation                                        │
-│     ├─ Token-level calculation                             │
-│     ├─ Per-model pricing lookup                           │
-│     └─ Budget ceiling check                                │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│  PHASE 2: ROUTING DECISION                                  │
-├─────────────────────────────────────────────────────────────┤
-│  1. Model Selection                                         │
-│     ├─ Default model assignment                            │
-│     ├─ Cost-aware downgrade                                │
-│     └─ Performance-based selection                         │
-│                                                             │
-│  2. RAG Decision                                            │
-│     ├─ Query complexity analysis                           │
-│     ├─ Context requirement assessment                      │
-│     └─ Retrieval threshold check                          │
-│                                                             │
-│  3. Cache Strategy                                          │
-│     ├─ Cache-first routing                                 │
-│     ├─ Cache key generation                                │
-│     └─ TTL validation                                      │
-└─────────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────────┐
-│  PHASE 3: POST-GENERATION ENFORCEMENT                       │
-├─────────────────────────────────────────────────────────────┤
-│  1. Quality Evaluation                                      │
-│     ├─ Hallucination detection                             │
-│     ├─ Grounding validation                                │
-│     └─ Confidence scoring                                  │
-│                                                             │
-│  2. Policy Enforcement                                       │
-│     ├─ Quality policy check                                │
-│     ├─ Cost policy validation                              │
-│     └─ Latency policy check                                │
-│                                                             │
-│  3. Action Execution                                        │
-│     ├─ return: Return output                                │
-│     ├─ retry: Retry with constraints                       │
-│     ├─ downgrade: Use cheaper model                       │
-│     ├─ block: Block output                                 │
-│     └─ redact: Remove problematic content                 │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> Ingress: Request Arrives
+    
+    Ingress --> RiskAnalysis: Validate Input
+    RiskAnalysis --> SafetyCheck: Calculate Risk
+    
+    SafetyCheck --> CostEstimation: Safe
+    SafetyCheck --> Blocked: Unsafe
+    
+    CostEstimation --> PolicyValidation: Estimate Cost
+    PolicyValidation --> RoutingDecision: Policy Check
+    
+    RoutingDecision --> ModelSelection: Select Strategy
+    ModelSelection --> CacheCheck: Choose Model
+    
+    CacheCheck --> CacheHit: Found
+    CacheCheck --> RAGDecision: Not Found
+    
+    RAGDecision --> InferenceExecution: Determine RAG
+    InferenceExecution --> QualityEvaluation: Generate Output
+    
+    QualityEvaluation --> PolicyEnforcement: Evaluate Quality
+    PolicyEnforcement --> ActionSelection: Check Policies
+    
+    ActionSelection --> Return: All Passed
+    ActionSelection --> Retry: Quality Low
+    ActionSelection --> Downgrade: Cost High
+    ActionSelection --> Blocked: Policy Violation
+    
+    Retry --> InferenceExecution: Retry with Constraints
+    Downgrade --> ModelSelection: Use Cheaper Model
+    
+    Return --> [*]: Success
+    Blocked --> [*]: Rejected
+    CacheHit --> [*]: Cached Response
+    
+    note right of SafetyCheck
+        Risk Score < 0.8
+        Hard Rejection if > 0.8
+    end note
+    
+    note right of CostEstimation
+        Token-level precision
+        Auto-downgrade enabled
+    end note
+    
+    note right of QualityEvaluation
+        Hallucination < 0.7
+        Grounding > 0.6
+    end note
 ```
 
-</div>
-
-### Decision Points
+### Governance Decision Matrix
 
 | Decision Point | Input | Output | Example |
 |---------------|-------|--------|---------|
