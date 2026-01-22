@@ -5,10 +5,22 @@
 <div>
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Architecture](https://img.shields.io/badge/Architecture-Control%20Plane-9B59B6?style=for-the-badge)]()
-[![Governance](https://img.shields.io/badge/Governance-Runtime%20Enforcement-E74C3C?style=for-the-badge)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![AsyncIO](https://img.shields.io/badge/AsyncIO-Asynchronous-3776AB?style=for-the-badge&logo=python&logoColor=white)]()
+[![Pydantic](https://img.shields.io/badge/Pydantic-Data%20Validation-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://pydantic.dev/)
+[![Redis](https://img.shields.io/badge/Redis-Caching-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Docker](https://img.shields.io/badge/Docker-Containerization-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![pytest](https://img.shields.io/badge/pytest-Testing-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)](https://pytest.org/)
+
+</div>
+
+<div>
+
+[![Sentence Transformers](https://img.shields.io/badge/Sentence%20Transformers-Embeddings-FF6B6B?style=for-the-badge)]()
+[![Open Policy Agent](https://img.shields.io/badge/OPA-Policy%20Engine-7D3C98?style=for-the-badge&logo=openpolicyagent&logoColor=white)](https://www.openpolicyagent.org/)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-000000?style=for-the-badge&logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge)]()
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)]()
 
 </div>
 
