@@ -334,24 +334,33 @@ Every policy decision includes:
 
 ## 💰 Cost-Aware Routing
 
-### Cost Model Architecture
+### Cost Calculation Process
 
-```mermaid
-graph LR
-    A[Request] --> B[Token Counting]
-    B --> C[Model Pricing Lookup]
-    C --> D[Cost Calculation]
-    D --> E{Policy Check}
-    E -->|Within Budget| F[Allow]
-    E -->|Exceeds Budget| G[Auto-Downgrade]
-    E -->|Severe Violation| H[Block]
-    
-    G --> I[Recalculate Cost]
-    I --> E
-    
-    style D fill:#3498DB
-    style E fill:#E74C3C
-    style G fill:#F39C12
+The cost model performs token-level estimation with the following steps:
+
+1. **Token Counting**: Uses tiktoken for OpenAI models, character approximation for others
+2. **Pricing Lookup**: Per-model pricing table (input/output rates per 1K tokens)
+3. **Cost Calculation**: `(input_tokens / 1000) * input_rate + (output_tokens / 1000) * output_rate`
+4. **Policy Check**: Compare against `max_cost_per_request` threshold
+5. **Decision**: 
+   - Within budget → Allow
+   - Exceeds threshold → Auto-downgrade to cheaper model
+   - Severe violation → Block request
+
+**Model Pricing (per 1K tokens):**
+- gpt-4-turbo: $0.01 input / $0.03 output
+- gpt-3.5-turbo: $0.0015 input / $0.002 output
+- claude-3-opus: $0.015 input / $0.075 output
+
+**Auto-Downgrade Logic:**
+```python
+if estimated_cost > threshold:
+    cheaper_model = suggest_cheaper_model(current_model)
+    new_cost = estimate_cost(prompt, cheaper_model)
+    if new_cost <= threshold:
+        route_to_model(cheaper_model)
+    else:
+        block_request("Cost exceeds budget")
 ```
 
 ### Cost Optimization Strategies
