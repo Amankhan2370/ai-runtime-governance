@@ -75,211 +75,190 @@ The **LLM Control Plane** is a production-grade runtime governance layer that or
 
 ## 🏗️ System Architecture
 
-### Control Plane Topology
+### Component Architecture
 
-```mermaid
-flowchart TD
-    subgraph IN["🌐 Ingress Layer"]
-        A1[API Gateway]
-        A2[Request Validator]
-        A3[Rate Limiter]
-    end
-    
-    subgraph GOV["⚖️ Governance Core"]
-        B1[Policy Engine<br/>YAML Policies]
-        B2[Risk Scorer<br/>Safety Analysis]
-        B3[Cost Model<br/>Token Estimation]
-        B4[Decision Matrix<br/>Multi-Factor Routing]
-    end
-    
-    subgraph EXE["⚡ Execution Engine"]
-        C1[Inference Orchestrator]
-        C2[RAG Pipeline]
-        C3[Cache Manager]
-        C4[Model Selector]
-    end
-    
-    subgraph ENF["🛡️ Enforcement Layer"]
-        D1[Quality Gate]
-        D2[Policy Validator]
-        D3[Action Executor]
-        D4[Output Transformer]
-    end
-    
-    subgraph EXT["🔌 External Services"]
-        E1[LLM Providers]
-        E2[Vector Stores]
-        E3[Cache Backend]
-        E4[Monitoring]
-    end
-    
-    A1 --> A2 --> A3
-    A3 --> B1
-    A3 --> B2
-    A3 --> B3
-    
-    B1 --> B4
-    B2 --> B4
-    B3 --> B4
-    
-    B4 --> C4
-    C4 --> C1
-    C4 --> C2
-    C4 --> C3
-    
-    C1 --> E1
-    C2 --> E2
-    C3 --> E3
-    
-    C1 --> D1
-    C2 --> D1
-    
-    D1 --> D2 --> D3 --> D4
-    D4 --> A1
-    
-    D3 --> E4
-    
-    style GOV fill:#9B59B6,stroke:#7D3C98,stroke-width:3px
-    style EXE fill:#3498DB,stroke:#2874A6,stroke-width:3px
-    style ENF fill:#E74C3C,stroke:#C0392B,stroke-width:3px
+The control plane is organized into four primary layers, each handling distinct responsibilities:
+
+**Ingress Layer** → **Governance Core** → **Execution Engine** → **Enforcement Layer**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    API Gateway (FastAPI)                      │
+│  • Request validation                                         │
+│  • Rate limiting                                             │
+│  • Authentication                                             │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+┌───────▼────────┐            ┌──────────▼──────────┐
+│ Policy Engine  │            │   Risk Scorer       │
+│ (YAML Config)  │            │  • Injection detect │
+└───────┬────────┘            │  • Safety classify  │
+        │                     └──────────┬──────────┘
+        │                                │
+┌───────▼────────────────────────────────▼──────────┐
+│              Decision Matrix                        │
+│  • Multi-factor routing                            │
+│  • Cost-aware model selection                      │
+│  • RAG requirement analysis                        │
+└───────┬────────────────────────────────────────────┘
+        │
+┌───────▼────────────────────────────────────────────┐
+│           Execution Orchestrator                    │
+│  • Inference adapter (OpenAI/Anthropic)            │
+│  • RAG pipeline (vector retrieval)                 │
+│  • Cache manager (in-memory/Redis)                 │
+└───────┬────────────────────────────────────────────┘
+        │
+┌───────▼────────────────────────────────────────────┐
+│         Enforcement & Quality Gate                  │
+│  • Post-generation evaluation                      │
+│  • Policy validation                               │
+│  • Action execution (return/retry/block)           │
+└────────────────────────────────────────────────────┘
 ```
 
-### Real-Time Decision Pipeline
+### Request Processing Flow
 
-```mermaid
-flowchart LR
-    subgraph INPUT["📥 Input"]
-        I1[Request]
-        I2[Context]
-        I3[Metadata]
-    end
-    
-    subgraph ANALYSIS["🔍 Analysis"]
-        A1{Risk<br/>Assessment}
-        A2{Cost<br/>Projection}
-        A3{Policy<br/>Compliance}
-    end
-    
-    subgraph ROUTING["🎯 Routing"]
-        R1[Model<br/>Selection]
-        R2[RAG<br/>Decision]
-        R3[Cache<br/>Strategy]
-    end
-    
-    subgraph EXECUTION["⚙️ Execution"]
-        E1[Inference]
-        E2[Retrieval]
-        E3[Generation]
-    end
-    
-    subgraph VALIDATION["✅ Validation"]
-        V1{Quality<br/>Check}
-        V2{Policy<br/>Enforcement}
-        V3{Action<br/>Selection}
-    end
-    
-    subgraph OUTPUT["📤 Output"]
-        O1[Response]
-        O2[Trace]
-        O3[Metrics]
-    end
-    
-    I1 --> A1
-    I2 --> A2
-    I3 --> A3
-    
-    A1 -->|Pass| R1
-    A1 -->|Fail| O1
-    A2 -->|Pass| R2
-    A2 -->|Fail| R1
-    A3 -->|Pass| R3
-    A3 -->|Fail| O1
-    
-    R1 --> E1
-    R2 --> E2
-    R3 --> E3
-    
-    E1 --> V1
-    E2 --> V1
-    E3 --> V1
-    
-    V1 -->|Pass| V2
-    V1 -->|Fail| V3
-    V2 -->|Pass| O1
-    V2 -->|Fail| V3
-    
-    V3 -->|Return| O1
-    V3 -->|Retry| E1
-    V3 -->|Block| O1
-    V3 -->|Downgrade| R1
-    
-    O1 --> O2 --> O3
-    
-    style ANALYSIS fill:#E74C3C,stroke:#C0392B
-    style ROUTING fill:#3498DB,stroke:#2874A6
-    style VALIDATION fill:#27AE60,stroke:#1E8449
+Each request undergoes a deterministic sequence of checks and transformations:
+
+**Stage 1: Pre-Generation Analysis**
 ```
+Request → Risk Scoring → Safety Check → Cost Estimation → Policy Validation
+   │            │              │                │                  │
+   └────────────┴──────────────┴────────────────┴──────────────────┘
+                                    │
+                           [Decision: Allow/Block]
+```
+
+**Stage 2: Routing & Execution**
+```
+Allowed Request → Model Selection → Cache Check → RAG Decision → Inference
+                      │                │              │              │
+                      └────────────────┴──────────────┴──────────────┘
+                                              │
+                                    [Output Generated]
+```
+
+**Stage 3: Post-Generation Enforcement**
+```
+Output → Quality Evaluation → Policy Check → Action Selection → Response
+   │            │                  │               │              │
+   └────────────┴──────────────────┴───────────────┴──────────────┘
+                        │
+            [Return/Retry/Downgrade/Block]
+```
+
+### Component Responsibilities
+
+| Component | Primary Function | Key Operations |
+|-----------|-----------------|----------------|
+| **Policy Engine** | Runtime policy enforcement | YAML policy loading, threshold checks, action determination |
+| **Risk Scorer** | Pre-generation safety analysis | Pattern matching, keyword scanning, risk calculation |
+| **Cost Model** | Token-level cost tracking | Token counting, pricing lookup, budget management |
+| **Router** | Intelligent request routing | Model selection, RAG decision, cache strategy |
+| **Decision Enforcer** | Post-generation validation | Quality gates, policy compliance, action execution |
 
 ---
 
 ## 🔄 Request Lifecycle Governance
 
-### Intelligent Decision Flow
+### Request Processing Stages
 
-```mermaid
-stateDiagram-v2
-    [*] --> Ingress: Request Arrives
+The control plane processes each request through three distinct stages with explicit decision points:
+
+**Stage 1: Pre-Generation Governance**
+
+Before any LLM call is made, the system performs:
+
+1. **Risk Assessment**
+   - Pattern matching for injection attempts
+   - Safety keyword scanning
+   - Risk score calculation (0.0 - 1.0)
+   - **Decision**: If risk > 0.8 → Hard rejection
+
+2. **Cost Projection**
+   - Token counting (input + estimated output)
+   - Model pricing lookup
+   - Cost calculation
+   - **Decision**: If cost > threshold → Auto-downgrade or block
+
+3. **Policy Validation**
+   - Safety policy check
+   - Cost policy check
+   - Latency budget validation
+   - **Decision**: All policies must pass to proceed
+
+**Stage 2: Routing & Execution**
+
+Once pre-generation checks pass:
+
+1. **Model Selection**
+   - Default model assignment
+   - Cost-aware downgrade (if needed)
+   - Performance-based selection
+
+2. **RAG Decision**
+   - Query complexity analysis
+   - Context requirement assessment
+   - Retrieval threshold evaluation
+
+3. **Cache Strategy**
+   - Cache key generation (SHA256 of prompt)
+   - TTL validation
+   - Cache-first routing when available
+
+**Stage 3: Post-Generation Enforcement**
+
+After output generation:
+
+1. **Quality Evaluation**
+   - Hallucination detection (semantic similarity)
+   - Grounding validation (context alignment)
+   - Confidence scoring
+
+2. **Policy Enforcement**
+   - Quality policy check (hallucination < 0.7, grounding > 0.6)
+   - Cost policy validation (actual vs. estimated)
+   - Latency policy check (SLO compliance)
+
+3. **Action Execution**
+   - `return`: All checks passed → Return output
+   - `retry`: Quality below threshold → Retry with constraints
+   - `downgrade`: Cost/latency exceeded → Use cheaper model
+   - `block`: Policy violation → Block output
+   - `redact`: Safety concern → Remove problematic content
+
+### Decision Logic
+
+The system uses explicit, deterministic logic for each decision:
+
+```python
+# Simplified decision logic (conceptual)
+def process_request(prompt):
+    # Pre-generation
+    risk = risk_scorer.score(prompt)
+    if risk > SAFETY_THRESHOLD:
+        return block("Safety violation")
     
-    Ingress --> RiskAnalysis: Validate Input
-    RiskAnalysis --> SafetyCheck: Calculate Risk
+    cost = cost_model.estimate(prompt, model)
+    if cost > COST_THRESHOLD:
+        model = cost_model.suggest_cheaper(model)
+        cost = cost_model.estimate(prompt, model)
     
-    SafetyCheck --> CostEstimation: Safe
-    SafetyCheck --> Blocked: Unsafe
+    # Routing
+    routing = router.route(prompt, cost_constraints)
     
-    CostEstimation --> PolicyValidation: Estimate Cost
-    PolicyValidation --> RoutingDecision: Policy Check
+    # Execution
+    output = inference.generate(prompt, routing.model)
     
-    RoutingDecision --> ModelSelection: Select Strategy
-    ModelSelection --> CacheCheck: Choose Model
+    # Post-generation
+    quality = evaluator.evaluate(output)
+    action = enforcer.enforce(output, quality, cost)
     
-    CacheCheck --> CacheHit: Found
-    CacheCheck --> RAGDecision: Not Found
-    
-    RAGDecision --> InferenceExecution: Determine RAG
-    InferenceExecution --> QualityEvaluation: Generate Output
-    
-    QualityEvaluation --> PolicyEnforcement: Evaluate Quality
-    PolicyEnforcement --> ActionSelection: Check Policies
-    
-    ActionSelection --> Return: All Passed
-    ActionSelection --> Retry: Quality Low
-    ActionSelection --> Downgrade: Cost High
-    ActionSelection --> Blocked: Policy Violation
-    
-    Retry --> InferenceExecution: Retry with Constraints
-    Downgrade --> ModelSelection: Use Cheaper Model
-    
-    Return --> [*]: Success
-    Blocked --> [*]: Rejected
-    CacheHit --> [*]: Cached Response
-    
-    note right of SafetyCheck
-        Risk Score < 0.8
-        Hard Rejection if > 0.8
-    end note
-    
-    note right of CostEstimation
-        Token-level precision
-        Auto-downgrade enabled
-    end note
-    
-    note right of QualityEvaluation
-        Hallucination < 0.7
-        Grounding > 0.6
-    end note
+    return action.execute(output)
 ```
-
-### Governance Decision Matrix
 
 | Decision Point | Input | Output | Example |
 |---------------|-------|--------|---------|
