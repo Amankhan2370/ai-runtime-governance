@@ -14,7 +14,7 @@
 
 **Runtime governance layer for LLM systems with real-time policy enforcement, cost-aware routing, and safety guarantees**
 
-*Platform-level infrastructure for production LLM deployments • Systems-level engineering for 2030*
+*Platform-level infrastructure for production LLM deployments*
 
 ---
 
