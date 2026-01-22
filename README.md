@@ -389,21 +389,35 @@ graph LR
 
 ## 🛡️ Safety & Reliability
 
-### Safety Classification Pipeline
+### Safety Classification Process
 
-```mermaid
-graph TB
-    A[Prompt Input] --> B[Pattern Matching]
-    B --> C[Keyword Scanning]
-    C --> D[Risk Score Calculation]
-    D --> E{Score > Threshold?}
-    E -->|No| F[Allow]
-    E -->|Yes| G{Hard Rejection?}
-    G -->|Yes| H[BLOCK]
-    G -->|No| I[Retry with Constraints]
-    
-    style D fill:#E74C3C
-    style H fill:#C0392B
+The safety classification system performs three sequential checks:
+
+**Check 1: Pattern Matching**
+- Scans for injection patterns (regex-based)
+- Detects instruction manipulation attempts
+- Pattern count: 7 common injection patterns
+
+**Check 2: Keyword Scanning**
+- Safety keyword detection
+- Content moderation keywords
+- Match scoring algorithm
+
+**Check 3: Risk Score Calculation**
+- Combines pattern matches (40% weight)
+- Incorporates keyword matches (40% weight)
+- Includes ambiguity analysis (20% weight)
+- Final score: 0.0 (safe) to 1.0 (high risk)
+
+**Decision Logic:**
+```
+if risk_score >= 0.8:
+    if hard_rejection_enabled:
+        action = BLOCK
+    else:
+        action = RETRY_WITH_CONSTRAINTS
+else:
+    action = ALLOW
 ```
 
 ### Reliability Features
