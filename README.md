@@ -853,26 +853,29 @@ pytest tests/test_policies.py::test_policy_engine_cost_check
 
 ---
 
+---
+
 ## 📝 License
 
 **Proprietary** - All rights reserved.
 
-This software and associated documentation are proprietary and confidential. Unauthorized copying, modification, distribution, or use is strictly prohibited.
+Unauthorized use, distribution, or modification of this software is prohibited.
+
+---
+
+## 🔗 Resources
+
+- **Documentation**: See inline code documentation and `config/policies.yaml` for policy configuration
+- **Issues**: [GitHub Issues](https://github.com/Amankhan2370/llm-control-plane/issues)
+- **Repository**: [llm-control-plane](https://github.com/Amankhan2370/llm-control-plane)
 
 ---
 
 <div align="center">
 
-### Contributing & Support
+**LLM Control Plane**  
+*Unified runtime governance for production LLM deployments*
 
-For questions, bug reports, or feature requests, please open an issue on GitHub.
-
-**Repository**: [llm-control-plane](https://github.com/Amankhan2370/llm-control-plane)  
-**Issues**: [Report Bug](https://github.com/Amankhan2370/llm-control-plane/issues) | [Request Feature](https://github.com/Amankhan2370/llm-control-plane/issues)
-
----
-
-**Production-Grade LLM Control Plane**  
-*Runtime governance for reliable AI systems • Platform infrastructure for 2030*
+*Every request. Every decision. Every policy. Enforced in real-time.*
 
 </div>
