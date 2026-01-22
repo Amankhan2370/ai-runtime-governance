@@ -1,0 +1,65 @@
+# LLM Control Plane Policies
+# Declarative policies enforced at runtime
+
+policies:
+  # Cost Policies
+  cost:
+    max_cost_per_request: 0.10  # USD
+    budget_ceiling: 1000.00  # USD per day
+    auto_downgrade_threshold: 0.05  # USD
+    cost_tracking: true
+    
+  # Safety Policies
+  safety:
+    hard_rejection_enabled: true
+    risk_threshold: 0.8
+    content_moderation: true
+    prompt_injection_detection: true
+    
+  # Quality Policies
+  quality:
+    min_grounding_score: 0.6
+    max_hallucination_probability: 0.7
+    min_confidence_score: 0.5
+    
+  # Latency Policies
+  latency:
+    max_latency_ms: 5000
+    p95_slo_ms: 3000
+    p99_slo_ms: 5000
+    
+  # Model Selection Policies
+  routing:
+    default_model: "gpt-4-turbo-preview"
+    fallback_model: "gpt-3.5-turbo"
+    cost_aware_routing: true
+    cache_first: true
+    
+  # RAG Policies
+  rag:
+    enabled: true
+    threshold: 0.7
+    required_for_complex_queries: true
+    max_retrieval_chunks: 5
+    
+  # Retry Policies
+  retry:
+    max_retries: 3
+    retry_on_low_quality: true
+    retry_with_stricter_constraints: true
+    exponential_backoff: true
+    
+  # Enforcement Actions
+  enforcement:
+    actions:
+      - return
+      - retry
+      - downgrade
+      - block
+      - redact
+    
+    conditions:
+      cost_exceeded: "block"
+      safety_violation: "block"
+      quality_below_threshold: "retry"
+      latency_exceeded: "downgrade"
